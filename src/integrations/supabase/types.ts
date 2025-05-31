@@ -9,7 +9,247 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      batches: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          batch_id: string | null
+          correct_answer: string
+          created_at: string
+          id: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question_text: string
+        }
+        Insert: {
+          batch_id?: string | null
+          correct_answer: string
+          created_at?: string
+          id?: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question_text: string
+        }
+        Update: {
+          batch_id?: string | null
+          correct_answer?: string
+          created_at?: string
+          id?: string
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
+          question_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          email: string
+          has_taken_test: boolean | null
+          id: string
+          name: string
+          password: string
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          email: string
+          has_taken_test?: boolean | null
+          id?: string
+          name: string
+          password: string
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          email?: string
+          has_taken_test?: boolean | null
+          id?: string
+          name?: string
+          password?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_sessions: {
+        Row: {
+          completed_at: string | null
+          id: string
+          started_at: string | null
+          student_id: string | null
+          test_id: string | null
+          total_questions: number | null
+          total_score: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          started_at?: string | null
+          student_id?: string | null
+          test_id?: string | null
+          total_questions?: number | null
+          total_score?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          started_at?: string | null
+          student_id?: string | null
+          test_id?: string | null
+          total_questions?: number | null
+          total_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_sessions_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_submissions: {
+        Row: {
+          id: string
+          question_id: string | null
+          selected_answer: string | null
+          student_id: string | null
+          submitted_at: string | null
+          test_id: string | null
+        }
+        Insert: {
+          id?: string
+          question_id?: string | null
+          selected_answer?: string | null
+          student_id?: string | null
+          submitted_at?: string | null
+          test_id?: string | null
+        }
+        Update: {
+          id?: string
+          question_id?: string | null
+          selected_answer?: string | null
+          student_id?: string | null
+          submitted_at?: string | null
+          test_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_submissions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_submissions_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tests: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          duration_minutes: number
+          end_time: string | null
+          id: string
+          is_active: boolean | null
+          start_time: string | null
+          title: string
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          duration_minutes?: number
+          end_time?: string | null
+          id?: string
+          is_active?: boolean | null
+          start_time?: string | null
+          title: string
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          duration_minutes?: number
+          end_time?: string | null
+          id?: string
+          is_active?: boolean | null
+          start_time?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tests_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
