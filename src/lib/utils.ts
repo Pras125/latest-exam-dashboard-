@@ -9,9 +9,11 @@ export function cn(...inputs: ClassValue[]) {
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://quiz-wizard.vercel.app';
 
 export const generateTestLink = (testId: string) => {
+  // Ensure the link points to the login page
   return `${BASE_URL}/test/${testId}`;
 };
 
 export const generatePassword = () => {
-  // Implementation
+  // Generate a random 6-digit password
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
