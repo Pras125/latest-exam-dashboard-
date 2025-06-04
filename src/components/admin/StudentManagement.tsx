@@ -163,9 +163,28 @@ const StudentManagement = () => {
 
     try {
       console.log('Fetching test for batch:', selectedBatch);
+      // First, let's check if the batch exists
+      const { data: batch, error: batchError } = await supabase
+        .from("batches")
+        .select("id, name")
+        .eq("id", selectedBatch)
+        .single();
+
+      if (batchError) {
+        console.error('Error fetching batch:', batchError);
+        throw new Error('Failed to fetch batch information');
+      }
+
+      if (!batch) {
+        throw new Error('Batch not found');
+      }
+
+      console.log('Batch found:', batch);
+
+      // Now fetch the test for this batch
       const { data: test, error: testError } = await supabase
         .from("tests")
-        .select("id, title")
+        .select("id, title, is_active")
         .eq("batch_id", selectedBatch)
         .single();
 
@@ -176,6 +195,13 @@ const StudentManagement = () => {
 
       if (!test) {
         throw new Error('No test found for this batch');
+      }
+
+      console.log('Test found:', test);
+
+      // Verify test is active
+      if (!test.is_active) {
+        throw new Error('Test is not active');
       }
 
       console.log('Fetching students for batch:', selectedBatch);
@@ -202,9 +228,8 @@ const StudentManagement = () => {
       // Ensure we're using the correct test ID in the URL
       const testLink = `${baseUrl}/test/${test.id}`;
       console.log('Test link:', testLink);
-
-      // Log the test ID for debugging
       console.log('Test ID:', test.id);
+      console.log('Test title:', test.title);
 
       const result = await sendTestEmails(studentList, testLink);
 
