@@ -1,11 +1,18 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import Head from "next/head";
 
 const TestLogin = () => {
@@ -13,73 +20,99 @@ const TestLogin = () => {
   const { id: testId } = router.query;
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [testInfo, setTestInfo] = useState<{
+    title: string;
+    batch_name: string;
+    start_time: string;
+    end_time: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
   useEffect(() => {
-    // Verify test exists and is active when component mounts
     if (testId && typeof testId === "string") {
-      verifyTest();
+      fetchTestInfo();
     }
   }, [testId]);
 
-  const verifyTest = async () => {
+  const fetchTestInfo = async () => {
     if (!testId || typeof testId !== "string") return;
-    
+
     try {
-      const { data, error } = await supabase
+      const { data: test, error } = await supabase
         .from("tests")
-        .select("id, title, is_active, start_time, end_time")
+        .select(`
+          title,
+          is_active,
+          start_time,
+          end_time,
+          batch:batches(name)
+        `)
         .eq("id", testId)
         .single();
 
-      if (error || !data) {
+      if (error) throw error;
+
+      if (!test) {
         toast({
           title: "Error",
           description: "Test not found",
           variant: "destructive",
         });
+        router.push("/");
         return;
       }
 
-      // Check if test is active
-      if (!data.is_active) {
+      if (!test.is_active) {
         toast({
           title: "Error",
           description: "This test is not active",
           variant: "destructive",
         });
+        router.push("/");
         return;
       }
 
-      // Check if test is within time window
       const now = new Date();
-      if (data.start_time && new Date(data.start_time) > now) {
+      const startTime = new Date(test.start_time);
+      const endTime = new Date(test.end_time);
+
+      if (now < startTime) {
         toast({
           title: "Error",
-          description: "This test has not started yet",
+          description: "Test has not started yet",
           variant: "destructive",
         });
+        router.push("/");
         return;
       }
 
-      if (data.end_time && new Date(data.end_time) < now) {
+      if (now > endTime) {
         toast({
           title: "Error",
-          description: "This test has ended",
+          description: "Test has ended",
           variant: "destructive",
         });
+        router.push("/");
         return;
       }
+
+      setTestInfo({
+        title: test.title,
+        batch_name: test.batch.name,
+        start_time: new Date(test.start_time).toLocaleString(),
+        end_time: new Date(test.end_time).toLocaleString(),
+      });
     } catch (error) {
-      console.error("Error verifying test:", error);
+      console.error("Error fetching test info:", error);
       toast({
         title: "Error",
-        description: "Failed to verify test",
+        description: "Failed to fetch test information",
         variant: "destructive",
       });
+      router.push("/");
     }
   };
 
@@ -89,19 +122,24 @@ const TestLogin = () => {
 
     setLoading(true);
     try {
-      // Verify student credentials
       const { data: student, error } = await supabase
         .from("students")
-        .select("id, name, email, password, has_taken_test")
+        .select("id, name, has_taken_test")
         .eq("email", formData.email)
         .eq("password", formData.password)
         .single();
 
-      if (error || !student) {
-        throw new Error("Invalid credentials");
+      if (error) throw error;
+
+      if (!student) {
+        toast({
+          title: "Error",
+          description: "Invalid email or password",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Check if student has already taken the test
       if (student.has_taken_test) {
         toast({
           title: "Error",
@@ -111,47 +149,18 @@ const TestLogin = () => {
         return;
       }
 
-      // Check if there's already an active session
-      const { data: existingSession, error: sessionCheckError } = await supabase
-        .from("test_sessions")
-        .select("id")
-        .eq("test_id", testId)
-        .eq("student_id", student.id)
-        .is("completed_at", null)
-        .single();
-
-      if (sessionCheckError && sessionCheckError.code !== "PGRST116") {
-        throw sessionCheckError;
-      }
-
-      let sessionId;
-
-      if (existingSession) {
-        // Use existing session
-        sessionId = existingSession.id;
-      } else {
-        // Create new test session
-        const { data: newSession, error: sessionError } = await supabase
-          .from("test_sessions")
-          .insert({
-            test_id: testId,
-            student_id: student.id,
-            started_at: new Date().toISOString(),
-          })
-          .select("id")
-          .single();
-
-        if (sessionError) throw sessionError;
-        sessionId = newSession.id;
-      }
+      // Store student info in session
+      sessionStorage.setItem("studentId", student.id);
+      sessionStorage.setItem("studentName", student.name);
+      sessionStorage.setItem("testId", testId);
 
       // Redirect to test page
-      router.push(`/test/${testId}/attempt`);
+      router.push(`/test/${testId}/questions`);
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Error during login:", error);
       toast({
         title: "Error",
-        description: "Invalid email or password",
+        description: "Failed to login. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -159,16 +168,32 @@ const TestLogin = () => {
     }
   };
 
+  if (!testInfo) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Head>
         <title>Test Login - Quiz Wizard</title>
         <meta name="description" content="Login to take your test" />
       </Head>
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Test Login</CardTitle>
-          <CardDescription>Enter your credentials to start the test</CardDescription>
+          <CardTitle className="text-2xl font-bold text-center">
+            {testInfo.title}
+          </CardTitle>
+          <CardDescription className="text-center">
+            Batch: {testInfo.batch_name}
+          </CardDescription>
+          <div className="text-sm text-gray-500 text-center mt-2">
+            <p>Start Time: {testInfo.start_time}</p>
+            <p>End Time: {testInfo.end_time}</p>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -179,7 +204,9 @@ const TestLogin = () => {
                 type="email"
                 placeholder="Enter your email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
                 required
               />
             </div>
@@ -190,12 +217,21 @@ const TestLogin = () => {
                 type="password"
                 placeholder="Enter your password"
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Logging in..." : "Start Test"}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Login to Start Test
             </Button>
           </form>
         </CardContent>
