@@ -172,7 +172,7 @@ const StudentManagement = () => {
 
       if (batchError) {
         console.error('Error fetching batch:', batchError);
-        throw new Error('Failed to fetch batch information');
+        throw new Error(`Failed to fetch batch information: ${batchError.message}`);
       }
 
       if (!batch) {
@@ -182,21 +182,27 @@ const StudentManagement = () => {
       console.log('Batch found:', batch);
 
       // Now fetch the test for this batch
-      const { data: test, error: testError } = await supabase
+      const { data: tests, error: testError } = await supabase
         .from("tests")
-        .select("id, title, is_active")
-        .eq("batch_id", selectedBatch)
-        .single();
+        .select(`
+          id,
+          title,
+          is_active,
+          batch_id
+        `)
+        .eq("batch_id", selectedBatch);
 
       if (testError) {
         console.error('Error fetching test:', testError);
-        throw new Error('Failed to fetch test information');
+        throw new Error(`Failed to fetch test information: ${testError.message}`);
       }
 
-      if (!test) {
+      if (!tests || tests.length === 0) {
         throw new Error('No test found for this batch');
       }
 
+      // Get the most recent test
+      const test = tests[0];
       console.log('Test found:', test);
 
       // Verify test is active
@@ -212,7 +218,7 @@ const StudentManagement = () => {
 
       if (studentError) {
         console.error('Error fetching students:', studentError);
-        throw new Error('Failed to fetch student list');
+        throw new Error(`Failed to fetch student list: ${studentError.message}`);
       }
 
       if (!studentList || studentList.length === 0) {
