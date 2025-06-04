@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Timer } from "lucide-react";
+import Head from "next/head";
 
 interface Question {
   id: string;
@@ -18,6 +19,9 @@ interface Test {
   title: string;
   duration_minutes: number;
   questions: Question[];
+  is_active: boolean;
+  start_time: string | null;
+  end_time: string | null;
 }
 
 interface TestData {
@@ -42,32 +46,42 @@ const TestAttempt = () => {
   const [answers, setAnswers] = useState<number[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!testId || typeof testId !== "string") return;
-    fetchTest();
+    verifySession();
   }, [testId]);
 
-  useEffect(() => {
-    if (!test) return;
+  const verifySession = async () => {
+    if (!testId || typeof testId !== "string") return;
 
-    // Set initial time
-    setTimeLeft(test.duration_minutes * 60);
+    try {
+      // Check if there's an active session for this test
+      const { data: session, error: sessionError } = await supabase
+        .from("test_sessions")
+        .select("id")
+        .eq("test_id", testId)
+        .is("completed_at", null)
+        .single();
 
-    // Start timer
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      if (sessionError || !session) {
+        toast({
+          title: "Error",
+          description: "Please log in to take the test",
+          variant: "destructive",
+        });
+        router.push(`/test/${testId}`);
+        return;
+      }
 
-    return () => clearInterval(timer);
-  }, [test]);
+      setSessionId(session.id);
+      fetchTest();
+    } catch (error) {
+      console.error("Error verifying session:", error);
+      router.push(`/test/${testId}`);
+    }
+  };
 
   const fetchTest = async () => {
     if (!testId || typeof testId !== "string") return;
@@ -79,6 +93,9 @@ const TestAttempt = () => {
           id,
           title,
           duration_minutes,
+          is_active,
+          start_time,
+          end_time,
           questions:test_questions(
             id,
             text,
@@ -91,11 +108,47 @@ const TestAttempt = () => {
 
       if (error) throw error;
 
+      // Check if test is active
+      if (!data.is_active) {
+        toast({
+          title: "Error",
+          description: "This test is not active",
+          variant: "destructive",
+        });
+        router.push("/");
+        return;
+      }
+
+      // Check if test is within time window
+      const now = new Date();
+      if (data.start_time && new Date(data.start_time) > now) {
+        toast({
+          title: "Error",
+          description: "This test has not started yet",
+          variant: "destructive",
+        });
+        router.push("/");
+        return;
+      }
+
+      if (data.end_time && new Date(data.end_time) < now) {
+        toast({
+          title: "Error",
+          description: "This test has ended",
+          variant: "destructive",
+        });
+        router.push("/");
+        return;
+      }
+
       // Transform the data to match our Test interface
       const transformedTest: Test = {
         id: data.id,
         title: data.title,
         duration_minutes: data.duration_minutes,
+        is_active: data.is_active,
+        start_time: data.start_time,
+        end_time: data.end_time,
         questions: (data.questions as unknown as Question[]).map(q => ({
           id: q.id,
           text: q.text,
@@ -117,6 +170,27 @@ const TestAttempt = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!test) return;
+
+    // Set initial time
+    setTimeLeft(test.duration_minutes * 60);
+
+    // Start timer
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [test]);
 
   const handleAnswer = (questionIndex: number, answerIndex: number) => {
     const newAnswers = [...answers];
@@ -201,76 +275,82 @@ const TestAttempt = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{test.title}</h1>
-          <div className="flex items-center space-x-2">
-            <Timer className="h-5 w-5" />
-            <span className="font-medium">{formatTime(timeLeft)}</span>
+    <>
+      <Head>
+        <title>{test?.title || 'Test'} - Quiz Wizard</title>
+        <meta name="description" content="Take your test" />
+      </Head>
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">{test?.title}</h1>
+            <div className="flex items-center space-x-2">
+              <Timer className="h-5 w-5" />
+              <span className="font-medium">{formatTime(timeLeft)}</span>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Question {currentQuestion + 1} of {test?.questions.length}</CardTitle>
+              <CardDescription>{test?.questions[currentQuestion].text}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {test?.questions[currentQuestion].options.map((option, index) => (
+                  <Button
+                    key={index}
+                    variant={answers[currentQuestion] === index ? "default" : "outline"}
+                    className="w-full justify-start"
+                    onClick={() => handleAnswer(currentQuestion, index)}
+                  >
+                    {option}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="flex justify-between mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentQuestion((prev) => Math.max(0, prev - 1))}
+                  disabled={currentQuestion === 0}
+                >
+                  Previous
+                </Button>
+                {currentQuestion < (test?.questions.length || 0) - 1 ? (
+                  <Button
+                    onClick={() => setCurrentQuestion((prev) => Math.min((test?.questions.length || 0) - 1, prev + 1))}
+                    disabled={answers[currentQuestion] === -1}
+                  >
+                    Next
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitting || answers.includes(-1)}
+                  >
+                    {submitting ? "Submitting..." : "Submit Test"}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            {test?.questions.map((_, index) => (
+              <Button
+                key={index}
+                variant={answers[index] === -1 ? "outline" : "default"}
+                size="sm"
+                onClick={() => setCurrentQuestion(index)}
+              >
+                {index + 1}
+              </Button>
+            ))}
           </div>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Question {currentQuestion + 1} of {test.questions.length}</CardTitle>
-            <CardDescription>{test.questions[currentQuestion].text}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {test.questions[currentQuestion].options.map((option, index) => (
-                <Button
-                  key={index}
-                  variant={answers[currentQuestion] === index ? "default" : "outline"}
-                  className="w-full justify-start"
-                  onClick={() => handleAnswer(currentQuestion, index)}
-                >
-                  {option}
-                </Button>
-              ))}
-            </div>
-
-            <div className="flex justify-between mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentQuestion((prev) => Math.max(0, prev - 1))}
-                disabled={currentQuestion === 0}
-              >
-                Previous
-              </Button>
-              {currentQuestion < test.questions.length - 1 ? (
-                <Button
-                  onClick={() => setCurrentQuestion((prev) => Math.min(test.questions.length - 1, prev + 1))}
-                  disabled={answers[currentQuestion] === -1}
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitting || answers.includes(-1)}
-                >
-                  {submitting ? "Submitting..." : "Submit Test"}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="mt-6 flex flex-wrap gap-2">
-          {test.questions.map((_, index) => (
-            <Button
-              key={index}
-              variant={answers[index] === -1 ? "outline" : "default"}
-              size="sm"
-              onClick={() => setCurrentQuestion(index)}
-            >
-              {index + 1}
-            </Button>
-          ))}
-        </div>
       </div>
-    </div>
+    </>
   );
 };
 
