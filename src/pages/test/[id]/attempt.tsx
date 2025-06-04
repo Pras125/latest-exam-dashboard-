@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Timer } from "lucide-react";
 import Head from "next/head";
+import { TestLayout } from "@/components/layout/TestLayout";
 
 interface Question {
   id: string;
@@ -248,109 +249,103 @@ const TestAttempt = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4">Loading test...</p>
+      <TestLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold mb-4">Loading test...</h2>
+            <p>Please wait while we prepare your test.</p>
+          </div>
         </div>
-      </div>
+      </TestLayout>
     );
   }
 
   if (!test) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">Test not found</h1>
-          <p className="mt-2">The test you're looking for doesn't exist or has been removed.</p>
+      <TestLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold mb-4">Test not found</h2>
+            <p>The test you're looking for doesn't exist or is no longer available.</p>
+          </div>
         </div>
-      </div>
+      </TestLayout>
     );
   }
 
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-  };
-
   return (
-    <>
+    <TestLayout>
       <Head>
-        <title>{test?.title || 'Test'} - Quiz Wizard</title>
+        <title>{test.title} - Quiz Wizard</title>
         <meta name="description" content="Take your test" />
       </Head>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">{test?.title}</h1>
+            <div>
+              <h1 className="text-2xl font-bold">{test.title}</h1>
+              <p className="text-gray-600">
+                Question {currentQuestion + 1} of {test.questions.length}
+              </p>
+            </div>
             <div className="flex items-center space-x-2">
               <Timer className="h-5 w-5" />
-              <span className="font-medium">{formatTime(timeLeft)}</span>
+              <span className="font-medium">
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </span>
             </div>
           </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Question {currentQuestion + 1} of {test?.questions.length}</CardTitle>
-              <CardDescription>{test?.questions[currentQuestion].text}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {test?.questions[currentQuestion].options.map((option, index) => (
-                  <Button
-                    key={index}
-                    variant={answers[currentQuestion] === index ? "default" : "outline"}
-                    className="w-full justify-start"
-                    onClick={() => handleAnswer(currentQuestion, index)}
-                  >
-                    {option}
-                  </Button>
-                ))}
-              </div>
+            <CardContent className="pt-6">
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-medium mb-4">
+                    {test.questions[currentQuestion].text}
+                  </h2>
+                  <div className="space-y-3">
+                    {test.questions[currentQuestion].options.map((option, index) => (
+                      <Button
+                        key={index}
+                        variant={answers[currentQuestion] === index ? "default" : "outline"}
+                        className="w-full justify-start"
+                        onClick={() => handleAnswer(currentQuestion, index)}
+                      >
+                        {option}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
 
-              <div className="flex justify-between mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentQuestion((prev) => Math.max(0, prev - 1))}
-                  disabled={currentQuestion === 0}
-                >
-                  Previous
-                </Button>
-                {currentQuestion < (test?.questions.length || 0) - 1 ? (
+                <div className="flex justify-between">
                   <Button
-                    onClick={() => setCurrentQuestion((prev) => Math.min((test?.questions.length || 0) - 1, prev + 1))}
-                    disabled={answers[currentQuestion] === -1}
+                    variant="outline"
+                    onClick={() => setCurrentQuestion(prev => Math.max(0, prev - 1))}
+                    disabled={currentQuestion === 0}
                   >
-                    Next
+                    Previous
                   </Button>
-                ) : (
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={submitting || answers.includes(-1)}
-                  >
-                    {submitting ? "Submitting..." : "Submit Test"}
-                  </Button>
-                )}
+                  {currentQuestion === test.questions.length - 1 ? (
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                    >
+                      {submitting ? "Submitting..." : "Submit Test"}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => setCurrentQuestion(prev => Math.min(test.questions.length - 1, prev + 1))}
+                    >
+                      Next
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            {test?.questions.map((_, index) => (
-              <Button
-                key={index}
-                variant={answers[index] === -1 ? "outline" : "default"}
-                size="sm"
-                onClick={() => setCurrentQuestion(index)}
-              >
-                {index + 1}
-              </Button>
-            ))}
-          </div>
         </div>
       </div>
-    </>
+    </TestLayout>
   );
 };
 

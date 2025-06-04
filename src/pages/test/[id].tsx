@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Head from "next/head";
+import { TestLayout } from "@/components/layout/TestLayout";
 
 const TestLogin = () => {
   const router = useRouter();
@@ -160,7 +161,7 @@ const TestLogin = () => {
   };
 
   return (
-    <>
+    <TestLayout>
       <Head>
         <title>Test Login - Quiz Wizard</title>
         <meta name="description" content="Login to take your test" />
@@ -202,7 +203,7 @@ const TestLogin = () => {
           </CardContent>
         </Card>
       </div>
-    </>
+    </TestLayout>
   );
 };
 
