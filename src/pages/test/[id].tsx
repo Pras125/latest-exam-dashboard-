@@ -31,7 +31,7 @@ const TestLogin = () => {
     try {
       const { data, error } = await supabase
         .from("tests")
-        .select("id, is_active, start_time, end_time")
+        .select("id, title, is_active, start_time, end_time")
         .eq("id", testId)
         .single();
 
@@ -41,7 +41,6 @@ const TestLogin = () => {
           description: "Test not found",
           variant: "destructive",
         });
-        router.push("/");
         return;
       }
 
@@ -52,7 +51,6 @@ const TestLogin = () => {
           description: "This test is not active",
           variant: "destructive",
         });
-        router.push("/");
         return;
       }
 
@@ -64,7 +62,6 @@ const TestLogin = () => {
           description: "This test has not started yet",
           variant: "destructive",
         });
-        router.push("/");
         return;
       }
 
@@ -74,12 +71,15 @@ const TestLogin = () => {
           description: "This test has ended",
           variant: "destructive",
         });
-        router.push("/");
         return;
       }
     } catch (error) {
       console.error("Error verifying test:", error);
-      router.push("/");
+      toast({
+        title: "Error",
+        description: "Failed to verify test",
+        variant: "destructive",
+      });
     }
   };
 

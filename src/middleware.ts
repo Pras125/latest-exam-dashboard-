@@ -5,8 +5,9 @@ export function middleware(request: NextRequest) {
   // Get the pathname of the request
   const path = request.nextUrl.pathname;
 
-  // If it's a test page, allow access without authentication
+  // Allow access to test pages without any restrictions
   if (path.startsWith('/test/')) {
+    // Ensure we're not redirecting test pages
     return NextResponse.next();
   }
 
@@ -14,8 +15,11 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Update the matcher to be more specific about test pages
 export const config = {
   matcher: [
+    // Match test pages
+    '/test/:path*',
     /*
      * Match all request paths except for the ones starting with:
      * - api (API routes)
