@@ -57,16 +57,35 @@ const QuestionUpload = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
+      // First create a test for the batch
+      const { data: test, error: testError } = await supabase
+        .from("tests")
+        .insert([{
+          batch_id: selectedBatch,
+          title: "Test for " + batches.find(b => b.id === selectedBatch)?.name,
+          duration_minutes: 60,
+          is_active: true,
+          start_time: new Date().toISOString(),
+          end_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+        }])
+        .select()
+        .single();
+
+      if (testError) throw testError;
+
+      // Then add the question
+      const { error: questionError } = await supabase
         .from("questions")
         .insert([{
           batch_id: selectedBatch,
+          test_id: test.id,
           ...questionForm,
         }]);
 
-      if (error) throw error;
+      if (questionError) throw questionError;
 
-      const newTestLink = generateTestLink(selectedBatch);
+      // Generate test link using the test ID
+      const newTestLink = generateTestLink(test.id);
       setTestLink(newTestLink);
       
       toast({ 
@@ -100,9 +119,23 @@ const QuestionUpload = () => {
 
     setLoading(true);
     try {
+      // First create a test for the batch
+      const { data: test, error: testError } = await supabase
+        .from("tests")
+        .insert([{
+          batch_id: selectedBatch,
+          title: "Test for " + batches.find(b => b.id === selectedBatch)?.name,
+          duration_minutes: 60,
+          is_active: true,
+          start_time: new Date().toISOString(),
+          end_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+        }])
+        .select()
+        .single();
+
+      if (testError) throw testError;
+
       const text = await file.text();
-      const newTestLink = generateTestLink(selectedBatch);
-      setTestLink(newTestLink);
       
       // Simple CSV/Excel parsing (assuming CSV format with headers)
       const lines = text.split('\n').filter(line => line.trim());
@@ -113,6 +146,7 @@ const QuestionUpload = () => {
         if (columns.length >= 6) {
           questions.push({
             batch_id: selectedBatch,
+            test_id: test.id,
             question_text: columns[0]?.trim(),
             option_a: columns[1]?.trim(),
             option_b: columns[2]?.trim(),
@@ -129,6 +163,10 @@ const QuestionUpload = () => {
           .insert(questions);
 
         if (error) throw error;
+
+        // Generate test link using the test ID
+        const newTestLink = generateTestLink(test.id);
+        setTestLink(newTestLink);
 
         toast({
           title: "Success",
