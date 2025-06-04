@@ -194,11 +194,15 @@ const StudentManagement = () => {
       }
 
       console.log(`Found ${studentList.length} students in batch`);
-      const testLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://quiz-wizard.vercel.app'}/test/${test.id}`;
+      // Get the base URL from window.location in browser or use default
+      const baseUrl = typeof window !== 'undefined' 
+        ? window.location.origin 
+        : 'https://quiz-wizard.vercel.app';
+      const testLink = `${baseUrl}/test/${test.id}`;
       console.log('Test link:', testLink);
 
       const result = await sendTestEmails(studentList, testLink);
-      
+
       if (result.success) {
         toast({
           title: "Success",
