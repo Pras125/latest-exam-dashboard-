@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Timer } from "lucide-react";
 import Head from "next/head";
-import { TestLayout } from "@/components/layout/TestLayout";
 
 interface Question {
   id: string;
@@ -249,103 +248,97 @@ const TestAttempt = () => {
 
   if (loading) {
     return (
-      <TestLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold mb-4">Loading test...</h2>
-            <p>Please wait while we prepare your test.</p>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-4">Loading test...</h2>
+          <p>Please wait while we prepare your test.</p>
         </div>
-      </TestLayout>
+      </div>
     );
   }
 
   if (!test) {
     return (
-      <TestLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold mb-4">Test not found</h2>
-            <p>The test you're looking for doesn't exist or is no longer available.</p>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-4">Test not found</h2>
+          <p>The test you're looking for doesn't exist or is no longer available.</p>
         </div>
-      </TestLayout>
+      </div>
     );
   }
 
   return (
-    <TestLayout>
+    <div className="min-h-screen bg-gray-50">
       <Head>
         <title>{test.title} - Quiz Wizard</title>
         <meta name="description" content="Take your test" />
       </Head>
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-2xl font-bold">{test.title}</h1>
-              <p className="text-gray-600">
-                Question {currentQuestion + 1} of {test.questions.length}
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Timer className="h-5 w-5" />
-              <span className="font-medium">
-                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-              </span>
-            </div>
+      <div className="max-w-4xl mx-auto p-4">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">{test.title}</h1>
+            <p className="text-gray-600">
+              Question {currentQuestion + 1} of {test.questions.length}
+            </p>
           </div>
+          <div className="flex items-center space-x-2">
+            <Timer className="h-5 w-5" />
+            <span className="font-medium">
+              {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </span>
+          </div>
+        </div>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-lg font-medium mb-4">
-                    {test.questions[currentQuestion].text}
-                  </h2>
-                  <div className="space-y-3">
-                    {test.questions[currentQuestion].options.map((option, index) => (
-                      <Button
-                        key={index}
-                        variant={answers[currentQuestion] === index ? "default" : "outline"}
-                        className="w-full justify-start"
-                        onClick={() => handleAnswer(currentQuestion, index)}
-                      >
-                        {option}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentQuestion(prev => Math.max(0, prev - 1))}
-                    disabled={currentQuestion === 0}
-                  >
-                    Previous
-                  </Button>
-                  {currentQuestion === test.questions.length - 1 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-medium mb-4">
+                  {test.questions[currentQuestion].text}
+                </h2>
+                <div className="space-y-3">
+                  {test.questions[currentQuestion].options.map((option, index) => (
                     <Button
-                      onClick={handleSubmit}
-                      disabled={submitting}
+                      key={index}
+                      variant={answers[currentQuestion] === index ? "default" : "outline"}
+                      className="w-full justify-start"
+                      onClick={() => handleAnswer(currentQuestion, index)}
                     >
-                      {submitting ? "Submitting..." : "Submit Test"}
+                      {option}
                     </Button>
-                  ) : (
-                    <Button
-                      onClick={() => setCurrentQuestion(prev => Math.min(test.questions.length - 1, prev + 1))}
-                    >
-                      Next
-                    </Button>
-                  )}
+                  ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+
+              <div className="flex justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentQuestion(prev => Math.max(0, prev - 1))}
+                  disabled={currentQuestion === 0}
+                >
+                  Previous
+                </Button>
+                {currentQuestion === test.questions.length - 1 ? (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                  >
+                    {submitting ? "Submitting..." : "Submit Test"}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setCurrentQuestion(prev => Math.min(test.questions.length - 1, prev + 1))}
+                  >
+                    Next
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-    </TestLayout>
+    </div>
   );
 };
 
