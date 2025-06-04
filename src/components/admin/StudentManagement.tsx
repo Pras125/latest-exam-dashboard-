@@ -38,6 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Plus, Mail, Loader2, Trash2 } from "lucide-react";
 import { sendTestEmails } from "@/lib/emailService";
+import { generateTestLink } from "@/lib/utils";
 
 interface Batch {
   id: string;
@@ -226,16 +227,10 @@ const StudentManagement = () => {
       }
 
       console.log(`Found ${studentList.length} students in batch`);
-      // Get the base URL from window.location in browser or use default
-      const baseUrl = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : 'https://quiz-wizard.vercel.app';
       
-      // Ensure we're using the correct test ID in the URL
-      const testLink = `${baseUrl}/test/${test.id}`;
-      console.log('Test link:', testLink);
-      console.log('Test ID:', test.id);
-      console.log('Test title:', test.title);
+      // Generate the test link using the utility function
+      const testLink = generateTestLink(test.id);
+      console.log('Generated test link:', testLink);
 
       const result = await sendTestEmails(studentList, testLink);
 
