@@ -165,7 +165,7 @@ const StudentManagement = () => {
       console.log('Fetching test for batch:', selectedBatch);
       const { data: test, error: testError } = await supabase
         .from("tests")
-        .select("id")
+        .select("id, title")
         .eq("batch_id", selectedBatch)
         .single();
 
@@ -198,8 +198,13 @@ const StudentManagement = () => {
       const baseUrl = typeof window !== 'undefined' 
         ? window.location.origin 
         : 'https://quiz-wizard.vercel.app';
+      
+      // Ensure we're using the correct test ID in the URL
       const testLink = `${baseUrl}/test/${test.id}`;
       console.log('Test link:', testLink);
+
+      // Log the test ID for debugging
+      console.log('Test ID:', test.id);
 
       const result = await sendTestEmails(studentList, testLink);
 
