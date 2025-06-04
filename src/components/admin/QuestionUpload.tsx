@@ -78,7 +78,6 @@ const QuestionUpload = () => {
         .from("questions")
         .insert([{
           batch_id: selectedBatch,
-          test_id: test.id,
           ...questionForm,
         }]);
 
@@ -146,7 +145,6 @@ const QuestionUpload = () => {
         if (columns.length >= 6) {
           questions.push({
             batch_id: selectedBatch,
-            test_id: test.id,
             question_text: columns[0]?.trim(),
             option_a: columns[1]?.trim(),
             option_b: columns[2]?.trim(),
