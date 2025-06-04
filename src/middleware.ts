@@ -2,31 +2,19 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Get the pathname of the request
-  const path = request.nextUrl.pathname;
-
-  // Allow access to test pages without any restrictions
-  if (path.startsWith('/test/')) {
-    // Ensure we're not redirecting test pages
+  // Allow access to test pages without authentication
+  if (request.nextUrl.pathname.startsWith("/test/")) {
     return NextResponse.next();
   }
 
-  // For all other pages, continue with normal flow
+  // For all other routes, continue with normal authentication
   return NextResponse.next();
 }
 
-// Update the matcher to be more specific about test pages
+// Configure which paths the middleware should run on
 export const config = {
   matcher: [
-    // Match test pages
-    '/test/:path*',
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    // Match all paths except static files, api routes, and test pages
+    "/((?!_next/static|_next/image|favicon.ico|api/|test/).*)",
   ],
 }; 

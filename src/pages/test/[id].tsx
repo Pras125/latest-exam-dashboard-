@@ -155,7 +155,7 @@ const TestLogin = () => {
       sessionStorage.setItem("testId", testId);
 
       // Redirect to test page
-      router.push(`/test/${testId}/questions`);
+      router.push(`/test/${testId}/attempt`);
     } catch (error) {
       console.error("Error during login:", error);
       toast({
