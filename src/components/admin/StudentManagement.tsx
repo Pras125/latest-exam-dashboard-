@@ -1,14 +1,43 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Plus, Mail } from "lucide-react";
+import { Upload, Plus, Mail, Loader2, Trash2 } from "lucide-react";
+import { sendTestEmails } from "@/lib/emailService";
 
 interface Batch {
   id: string;
@@ -28,13 +57,16 @@ const StudentManagement = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedBatch, setSelectedBatch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
   const { toast } = useToast();
 
-  // Manual student form
   const [studentForm, setStudentForm] = useState({
     name: "",
     email: "",
   });
+
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     fetchBatches();
@@ -75,9 +107,9 @@ const StudentManagement = () => {
     }
   };
 
-  const generatePassword = () => {
-    return Math.random().toString(36).slice(-8);
-  };
+  const generatePassword = () =>
+    Math.random().toString(36).slice(-10) +
+    Math.random().toString(36).toUpperCase().slice(-2);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,23 +118,23 @@ const StudentManagement = () => {
     setLoading(true);
     try {
       const password = generatePassword();
-      
-      const { error } = await supabase
-        .from("students")
-        .insert([{
+
+      const { error } = await supabase.from("students").insert([
+        {
           batch_id: selectedBatch,
           name: studentForm.name,
           email: studentForm.email,
-          password: password,
-        }]);
+          password,
+        },
+      ]);
 
       if (error) throw error;
 
-      toast({ 
-        title: "Success", 
+      toast({
+        title: "Success",
         description: `Student added with password: ${password}`,
       });
-      
+
       setStudentForm({ name: "", email: "" });
       fetchStudents();
     } catch (error) {
@@ -117,6 +149,84 @@ const StudentManagement = () => {
     }
   };
 
+  const handleSendTestEmails = async () => {
+    if (!selectedBatch) {
+      toast({
+        title: "Error",
+        description: "Please select a batch first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEmailSending(true);
+
+    try {
+      console.log('Fetching test for batch:', selectedBatch);
+      const { data: test, error: testError } = await supabase
+        .from("tests")
+        .select("id")
+        .eq("batch_id", selectedBatch)
+        .single();
+
+      if (testError) {
+        console.error('Error fetching test:', testError);
+        throw new Error('Failed to fetch test information');
+      }
+
+      if (!test) {
+        throw new Error('No test found for this batch');
+      }
+
+      console.log('Fetching students for batch:', selectedBatch);
+      const { data: studentList, error: studentError } = await supabase
+        .from("students")
+        .select("id, name, email, password")
+        .eq("batch_id", selectedBatch);
+
+      if (studentError) {
+        console.error('Error fetching students:', studentError);
+        throw new Error('Failed to fetch student list');
+      }
+
+      if (!studentList || studentList.length === 0) {
+        throw new Error('No students found in this batch');
+      }
+
+      console.log(`Found ${studentList.length} students in batch`);
+      const testLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://quiz-wizard.vercel.app'}/test/${test.id}`;
+      console.log('Test link:', testLink);
+
+      const result = await sendTestEmails(studentList, testLink);
+      
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Successfully sent test invitations to all ${result.successCount} students`,
+        });
+      } else {
+        const message = result.failedCount > 0 
+          ? `Sent ${result.successCount} emails successfully. Failed to send ${result.failedCount} emails.`
+          : 'Failed to send test invitations';
+        
+        toast({
+          title: "Partial Success",
+          description: message,
+          variant: result.successCount === 0 ? "destructive" : "default",
+        });
+      }
+    } catch (error) {
+      console.error("Error sending test emails:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send test links",
+        variant: "destructive",
+      });
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedBatch) return;
@@ -124,13 +234,13 @@ const StudentManagement = () => {
     setLoading(true);
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      const students = [];
+      const lines = text.split("\n").filter((line) => line.trim());
+      const studentsToUpload = [];
 
-      for (let i = 1; i < lines.length; i++) { // Skip header
-        const columns = lines[i].split(',');
+      for (let i = 1; i < lines.length; i++) {
+        const columns = lines[i].split(",");
         if (columns.length >= 2) {
-          students.push({
+          studentsToUpload.push({
             batch_id: selectedBatch,
             name: columns[0]?.trim(),
             email: columns[1]?.trim(),
@@ -139,18 +249,14 @@ const StudentManagement = () => {
         }
       }
 
-      if (students.length > 0) {
-        const { error } = await supabase
-          .from("students")
-          .insert(students);
-
+      if (studentsToUpload.length > 0) {
+        const { error } = await supabase.from("students").insert(studentsToUpload);
         if (error) throw error;
 
         toast({
           title: "Success",
-          description: `${students.length} students uploaded successfully`,
+          description: `${studentsToUpload.length} students uploaded successfully`,
         });
-        
         fetchStudents();
       } else {
         toast({
@@ -172,21 +278,35 @@ const StudentManagement = () => {
     }
   };
 
-  const sendTestEmails = async () => {
-    if (!selectedBatch) {
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase
+        .from("students")
+        .delete()
+        .eq("id", studentToDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Student deleted successfully",
+      });
+
+      fetchStudents();
+    } catch (error) {
+      console.error("Error deleting student:", error);
       toast({
         title: "Error",
-        description: "Please select a batch first",
+        description: "Failed to delete student",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setDeleteLoading(false);
+      setStudentToDelete(null);
     }
-
-    // This would integrate with your email service
-    toast({
-      title: "Feature Coming Soon",
-      description: "Email sending functionality will be implemented with email service integration",
-    });
   };
 
   return (
@@ -226,7 +346,9 @@ const StudentManagement = () => {
                   id="name"
                   placeholder="Enter student name"
                   value={studentForm.name}
-                  onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setStudentForm({ ...studentForm, name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -237,7 +359,9 @@ const StudentManagement = () => {
                   type="email"
                   placeholder="Enter email address"
                   value={studentForm.email}
-                  onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setStudentForm({ ...studentForm, email: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -273,8 +397,12 @@ const StudentManagement = () => {
                   <li>Columns: Name, Email</li>
                 </ul>
               </div>
-              <Button onClick={sendTestEmails} disabled={!selectedBatch}>
-                <Mail className="h-4 w-4 mr-2" />
+              <Button onClick={handleSendTestEmails} disabled={!selectedBatch || emailSending}>
+                {emailSending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
                 Send Test Links to All
               </Button>
             </div>
@@ -295,6 +423,7 @@ const StudentManagement = () => {
                 <TableHead>Email</TableHead>
                 <TableHead>Batch</TableHead>
                 <TableHead>Test Status</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -304,13 +433,25 @@ const StudentManagement = () => {
                   <TableCell>{student.email}</TableCell>
                   <TableCell>{student.batch?.name}</TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      student.has_taken_test 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {student.has_taken_test ? 'Completed' : 'Pending'}
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        student.has_taken_test
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {student.has_taken_test ? "Completed" : "Pending"}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setStudentToDelete(student)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -318,6 +459,32 @@ const StudentManagement = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!studentToDelete} onOpenChange={() => setStudentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Student</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {studentToDelete?.name}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteStudent}
+              disabled={deleteLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

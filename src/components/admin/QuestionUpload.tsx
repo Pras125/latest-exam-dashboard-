@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Plus, FileText } from "lucide-react";
+import { Upload, Plus, FileText, Link } from "lucide-react";
+import { generateTestLink } from "@/lib/utils";
 
 interface Batch {
   id: string;
@@ -20,6 +20,7 @@ const QuestionUpload = () => {
   const [selectedBatch, setSelectedBatch] = useState("");
   const [uploadType, setUploadType] = useState<"manual" | "file">("manual");
   const [loading, setLoading] = useState(false);
+  const [testLink, setTestLink] = useState<string>("");
   const { toast } = useToast();
 
   // Manual question form
@@ -65,7 +66,14 @@ const QuestionUpload = () => {
 
       if (error) throw error;
 
-      toast({ title: "Success", description: "Question added successfully" });
+      const newTestLink = generateTestLink(selectedBatch);
+      setTestLink(newTestLink);
+      
+      toast({ 
+        title: "Success", 
+        description: "Question added successfully" 
+      });
+      
       setQuestionForm({
         question_text: "",
         option_a: "",
@@ -93,6 +101,8 @@ const QuestionUpload = () => {
     setLoading(true);
     try {
       const text = await file.text();
+      const newTestLink = generateTestLink(selectedBatch);
+      setTestLink(newTestLink);
       
       // Simple CSV/Excel parsing (assuming CSV format with headers)
       const lines = text.split('\n').filter(line => line.trim());
@@ -146,6 +156,41 @@ const QuestionUpload = () => {
 
   return (
     <div className="space-y-6">
+      {testLink && (
+        <Card className="bg-green-50 border-green-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link className="h-5 w-5" />
+              Test Link Generated
+            </CardTitle>
+            <CardDescription>
+              Share this link with students to take the test
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Input
+                value={testLink}
+                readOnly
+                className="font-mono"
+              />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(testLink);
+                  toast({
+                    title: "Copied!",
+                    description: "Test link copied to clipboard",
+                  });
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       <Card>
         <CardHeader>
           <CardTitle>Select Batch</CardTitle>

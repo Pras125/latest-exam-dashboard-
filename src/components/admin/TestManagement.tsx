@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Play, Square, Timer, Users } from "lucide-react";
+import { generateTestLink } from "@/lib/utils";
 
 interface Batch {
   id: string;
@@ -38,6 +39,11 @@ const TestManagement = () => {
     duration_minutes: 60,
     start_time: "",
     end_time: "",
+    security: {
+      screen_monitoring: true,
+      disable_right_click: true,
+      require_camera: true,
+    },
   });
 
   useEffect(() => {
@@ -99,13 +105,7 @@ const TestManagement = () => {
 
       if (error) throw error;
 
-      toast({ title: "Success", description: "Test created successfully" });
-      setTestForm({
-        title: "",
-        duration_minutes: 60,
-        start_time: "",
-        end_time: "",
-      });
+     
       fetchTests();
     } catch (error) {
       console.error("Error creating test:", error);
@@ -117,6 +117,7 @@ const TestManagement = () => {
     } finally {
       setLoading(false);
     }
+    
   };
 
   const toggleTestStatus = async (testId: string, isActive: boolean) => {
@@ -184,7 +185,20 @@ const TestManagement = () => {
                 />
               </div>
             </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div className="flex items-center space-x-2">
+    <Switch 
+      id="screen-monitoring" 
+      checked={testForm.security.screen_monitoring}
+      onCheckedChange={checked => setTestForm({...testForm, security: {
+        ...testForm.security,
+        screen_monitoring: checked
+      }})}
+    />
+    <Label htmlFor="screen-monitoring">Screen Monitoring</Label>
+  </div>
+  {/* Add similar switches for other security features */}
+</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="duration">Duration (minutes)</Label>
