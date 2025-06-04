@@ -57,15 +57,12 @@ const TestAttempt = () => {
     if (!testId || typeof testId !== "string") return;
 
     try {
-      // Check if there's an active session for this test
-      const { data: session, error: sessionError } = await supabase
-        .from("test_sessions")
-        .select("id")
-        .eq("test_id", testId)
-        .is("completed_at", null)
-        .single();
+      // Get session ID from sessionStorage
+      const storedSessionId = sessionStorage.getItem("sessionId");
+      const storedStudentId = sessionStorage.getItem("studentId");
+      const storedTestId = sessionStorage.getItem("testId");
 
-      if (sessionError || !session) {
+      if (!storedSessionId || !storedStudentId || storedTestId !== testId) {
         toast({
           title: "Error",
           description: "Please log in to take the test",
@@ -75,7 +72,33 @@ const TestAttempt = () => {
         return;
       }
 
-      setSessionId(session.id);
+      // Verify the session exists and is active
+      const { data: session, error: sessionError } = await supabase
+        .from("test_sessions")
+        .select("id")
+        .eq("id", storedSessionId)
+        .eq("student_id", storedStudentId)
+        .eq("test_id", testId)
+        .is("completed_at", null)
+        .single();
+
+      if (sessionError || !session) {
+        // Clear session storage if session is invalid
+        sessionStorage.removeItem("sessionId");
+        sessionStorage.removeItem("studentId");
+        sessionStorage.removeItem("studentName");
+        sessionStorage.removeItem("testId");
+
+        toast({
+          title: "Error",
+          description: "Your session has expired. Please log in again.",
+          variant: "destructive",
+        });
+        router.push(`/test/${testId}`);
+        return;
+      }
+
+      setSessionId(storedSessionId);
       fetchTest();
     } catch (error) {
       console.error("Error verifying session:", error);

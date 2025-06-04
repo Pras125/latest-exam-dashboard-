@@ -33,6 +33,16 @@ const TestLogin = () => {
 
   useEffect(() => {
     if (testId && typeof testId === "string") {
+      // Check if user is already logged in
+      const studentId = sessionStorage.getItem("studentId");
+      const storedTestId = sessionStorage.getItem("testId");
+      
+      if (studentId && storedTestId === testId) {
+        // User is already logged in, redirect to attempt page
+        router.push(`/test/${testId}/attempt`);
+        return;
+      }
+      
       fetchTestInfo();
     }
   }, [testId]);
@@ -44,6 +54,7 @@ const TestLogin = () => {
       const { data: test, error } = await supabase
         .from("tests")
         .select(`
+          id,
           title,
           is_active,
           start_time,
@@ -149,10 +160,24 @@ const TestLogin = () => {
         return;
       }
 
+      // Create a test session
+      const { data: session, error: sessionError } = await supabase
+        .from("test_sessions")
+        .insert([{
+          test_id: testId,
+          student_id: student.id,
+          started_at: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+
       // Store student info in session
       sessionStorage.setItem("studentId", student.id);
       sessionStorage.setItem("studentName", student.name);
       sessionStorage.setItem("testId", testId);
+      sessionStorage.setItem("sessionId", session.id);
 
       // Redirect to test page
       router.push(`/test/${testId}/attempt`);
