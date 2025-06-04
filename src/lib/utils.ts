@@ -6,7 +6,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Get the base URL from environment variable or use a default
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://quiz-wizard.vercel.app';
+const BASE_URL = typeof window !== 'undefined' 
+  ? window.location.origin 
+  : 'https://quiz-wizard.vercel.app';
 
 export const generateTestLink = (testId: string) => {
   // Ensure the link points to the login page
