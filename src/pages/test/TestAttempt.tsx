@@ -3,21 +3,24 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
 interface Question {
   id: string;
-  text: string;
-  options: string[];
-  correct_answer: number;
-}
-
-interface Test {
-  id: string;
-  title: string;
-  duration_minutes: number;
-  questions: Question[];
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
 }
 
 const TestAttempt = () => {
@@ -25,223 +28,161 @@ const TestAttempt = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [test, setTest] = useState<Test | null>(null);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<number[]>([]);
-  const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [testInfo, setTestInfo] = useState<{
+    title: string;
+    duration_minutes: number;
+  } | null>(null);
 
   useEffect(() => {
-    if (!testId) return;
-    verifySession();
-  }, [testId]);
-
-  const verifySession = async () => {
-    if (!testId) return;
-
-    try {
-      // Get session ID from sessionStorage
-      const storedSessionId = sessionStorage.getItem("sessionId");
-      const storedStudentId = sessionStorage.getItem("studentId");
+    if (testId) {
+      // Check if user is logged in
+      const studentId = sessionStorage.getItem("studentId");
       const storedTestId = sessionStorage.getItem("testId");
-
-      if (!storedSessionId || !storedStudentId || storedTestId !== testId) {
+      
+      if (!studentId || storedTestId !== testId) {
         toast({
           title: "Error",
-          description: "Please log in to take the test",
+          description: "Please login to take the test",
           variant: "destructive",
         });
         navigate(`/test/${testId}`);
         return;
       }
-
-      // Verify the session exists and is active
-      const { data: session, error: sessionError } = await supabase
-        .from("test_sessions")
-        .select("id")
-        .eq("id", storedSessionId)
-        .eq("student_id", storedStudentId)
-        .eq("test_id", testId)
-        .is("completed_at", null)
-        .single();
-
-      if (sessionError || !session) {
-        // Clear session storage if session is invalid
-        sessionStorage.removeItem("sessionId");
-        sessionStorage.removeItem("studentId");
-        sessionStorage.removeItem("studentName");
-        sessionStorage.removeItem("testId");
-
-        toast({
-          title: "Error",
-          description: "Your session has expired. Please log in again.",
-          variant: "destructive",
-        });
-        navigate(`/test/${testId}`);
-        return;
-      }
-
-      setSessionId(storedSessionId);
-      fetchTest();
-    } catch (error) {
-      console.error("Error verifying session:", error);
-      navigate(`/test/${testId}`);
+      
+      fetchTestAndQuestions();
     }
-  };
+  }, [testId, navigate]);
 
-  const fetchTest = async () => {
+  const fetchTestAndQuestions = async () => {
     if (!testId) return;
 
     try {
-      const { data, error } = await supabase
+      // First fetch test info
+      const { data: test, error: testError } = await supabase
         .from("tests")
-        .select(`
-          id,
-          title,
-          duration_minutes,
-          is_active,
-          start_time,
-          end_time,
-          questions:test_questions(
-            id,
-            text,
-            options,
-            correct_answer
-          )
-        `)
+        .select("id, title, duration_minutes, batch_id")
         .eq("id", testId)
         .single();
 
-      if (error) throw error;
+      if (testError) throw testError;
 
-      // Check if test is active
-      if (!data.is_active) {
+      if (!test) {
         toast({
           title: "Error",
-          description: "This test is not active",
+          description: "Test not found",
           variant: "destructive",
         });
         navigate("/");
         return;
       }
 
-      // Check if test is within time window
-      const now = new Date();
-      if (data.start_time && new Date(data.start_time) > now) {
+      setTestInfo({
+        title: test.title,
+        duration_minutes: test.duration_minutes,
+      });
+
+      // Then fetch questions
+      const { data: questions, error: questionsError } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("batch_id", test.batch_id);
+
+      if (questionsError) throw questionsError;
+
+      if (!questions || questions.length === 0) {
         toast({
           title: "Error",
-          description: "This test has not started yet",
+          description: "No questions found for this test",
           variant: "destructive",
         });
         navigate("/");
         return;
       }
 
-      if (data.end_time && new Date(data.end_time) < now) {
-        toast({
-          title: "Error",
-          description: "This test has ended",
-          variant: "destructive",
-        });
-        navigate("/");
-        return;
-      }
-
-      setTest(data);
-      setTimeLeft(data.duration_minutes * 60);
-      setLoading(false);
+      setQuestions(questions);
     } catch (error) {
       console.error("Error fetching test:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch test",
+        description: "Failed to load test questions",
         variant: "destructive",
       });
       navigate("/");
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (timeLeft > 0) {
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            handleSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [timeLeft]);
-
-  const handleAnswer = (answerIndex: number) => {
-    const newAnswers = [...answers];
-    newAnswers[currentQuestion] = answerIndex;
-    setAnswers(newAnswers);
-  };
-
-  const handleNext = () => {
-    if (currentQuestion < (test?.questions.length || 0) - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
-    }
+  const handleAnswerChange = (questionId: string, answer: string) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: answer,
+    }));
   };
 
   const handleSubmit = async () => {
-    if (!test || !testId) return;
+    if (!testId) return;
 
     setSubmitting(true);
     try {
-      // Calculate score
-      const score = test.questions.reduce((total, question, index) => {
-        return total + (answers[index] === question.correct_answer ? 1 : 0);
-      }, 0);
+      const studentId = sessionStorage.getItem("studentId");
+      const sessionId = sessionStorage.getItem("sessionId");
+
+      if (!studentId || !sessionId) {
+        throw new Error("Session information missing");
+      }
+
+      // Submit all answers
+      const submissions = Object.entries(answers).map(([questionId, selectedAnswer]) => ({
+        test_id: testId,
+        student_id: studentId,
+        question_id: questionId,
+        selected_answer: selectedAnswer,
+        submitted_at: new Date().toISOString(),
+      }));
+
+      const { error: submissionsError } = await supabase
+        .from("test_submissions")
+        .insert(submissions);
+
+      if (submissionsError) throw submissionsError;
 
       // Update test session
-      const { error } = await supabase
+      const { error: sessionError } = await supabase
         .from("test_sessions")
         .update({
           completed_at: new Date().toISOString(),
-          total_score: score,
-          total_questions: test.questions.length,
         })
         .eq("id", sessionId);
 
-      if (error) throw error;
+      if (sessionError) throw sessionError;
 
-      // Mark student as having taken the test
-      const studentId = sessionStorage.getItem("studentId");
-      if (studentId) {
-        const { error: studentError } = await supabase
-          .from("students")
-          .update({ has_taken_test: true })
-          .eq("id", studentId);
+      // Update student's has_taken_test status
+      const { error: studentError } = await supabase
+        .from("students")
+        .update({
+          has_taken_test: true,
+        })
+        .eq("id", studentId);
 
-        if (studentError) throw studentError;
-      }
-
-      // Clear session
-      sessionStorage.removeItem("sessionId");
-      sessionStorage.removeItem("studentId");
-      sessionStorage.removeItem("studentName");
-      sessionStorage.removeItem("testId");
+      if (studentError) throw studentError;
 
       toast({
         title: "Success",
         description: "Test submitted successfully",
       });
 
-      navigate("/test-complete");
+      // Clear session storage
+      sessionStorage.removeItem("studentId");
+      sessionStorage.removeItem("studentName");
+      sessionStorage.removeItem("testId");
+      sessionStorage.removeItem("sessionId");
+
+      // Redirect to home
+      navigate("/");
     } catch (error) {
       console.error("Error submitting test:", error);
       toast({
@@ -256,88 +197,66 @@ const TestAttempt = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-4">Loading test...</h2>
-          <p>Please wait while we prepare your test.</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
-
-  if (!test) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-4">Test not found</h2>
-          <p>The test you're looking for doesn't exist or is no longer available.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const currentQ = test.questions[currentQuestion];
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">{test.title}</h1>
-          <div className="text-lg font-semibold">
-            Time Left: {minutes}:{seconds.toString().padStart(2, "0")}
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Question {currentQuestion + 1} of {test.questions.length}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <p className="text-lg">{currentQ.text}</p>
-              <div className="space-y-3">
-                {currentQ.options.map((option, index) => (
-                  <Button
-                    key={index}
-                    variant={answers[currentQuestion] === index ? "default" : "outline"}
-                    className="w-full justify-start"
-                    onClick={() => handleAnswer(index)}
-                  >
-                    {option}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-between mt-8">
-              <Button
-                variant="outline"
-                onClick={handlePrevious}
-                disabled={currentQuestion === 0}
-              >
-                Previous
-              </Button>
-              {currentQuestion === test.questions.length - 1 ? (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitting}
+    <div className="container mx-auto py-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>{testInfo?.title}</CardTitle>
+          <CardDescription>
+            Duration: {testInfo?.duration_minutes} minutes
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-8">
+            {questions.map((question, index) => (
+              <div key={question.id} className="space-y-4">
+                <h3 className="text-lg font-medium">
+                  Question {index + 1}: {question.question_text}
+                </h3>
+                <RadioGroup
+                  value={answers[question.id] || ""}
+                  onValueChange={(value) => handleAnswerChange(question.id, value)}
                 >
-                  {submitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : null}
-                  Submit Test
-                </Button>
-              ) : (
-                <Button onClick={handleNext}>Next</Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="A" id={`${question.id}-A`} />
+                      <Label htmlFor={`${question.id}-A`}>{question.option_a}</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="B" id={`${question.id}-B`} />
+                      <Label htmlFor={`${question.id}-B`}>{question.option_b}</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="C" id={`${question.id}-C`} />
+                      <Label htmlFor={`${question.id}-C`}>{question.option_c}</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="D" id={`${question.id}-D`} />
+                      <Label htmlFor={`${question.id}-D`}>{question.option_d}</Label>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+            ))}
+            <Button
+              className="w-full"
+              onClick={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Submit Test
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
