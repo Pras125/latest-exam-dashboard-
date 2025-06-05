@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Copy, Share2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface Test {
   id: string;
@@ -43,6 +51,7 @@ const TestManagement = () => {
   const [loading, setLoading] = useState(true);
   const [tests, setTests] = useState<Test[]>([]);
   const [deletingTestId, setDeletingTestId] = useState<string | null>(null);
+  const [selectedTest, setSelectedTest] = useState<Test | null>(null);
 
   useEffect(() => {
     fetchTests();
@@ -126,6 +135,19 @@ const TestManagement = () => {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Success",
+      description: "Link copied to clipboard",
+    });
+  };
+
+  const getTestLink = (testId: string) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/test/${testId}`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -173,7 +195,40 @@ const TestManagement = () => {
                   <TableCell>
                     {new Date(test.created_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedTest(test)}
+                        >
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Share
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Share Test Link</DialogTitle>
+                          <DialogDescription>
+                            Share this link with students to allow them to take the test.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex items-center space-x-2 mt-4">
+                          <div className="flex-1 p-2 bg-gray-100 rounded-md">
+                            {getTestLink(test.id)}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(getTestLink(test.id))}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
