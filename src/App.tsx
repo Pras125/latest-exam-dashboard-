@@ -8,6 +8,8 @@ import NotFound from "./pages/NotFound";
 import TestLogin from "./pages/test/TestLogin";
 import TestAttempt from "./pages/test/TestAttempt";
 import TestManagement from "./pages/TestManagement";
+import ExamPage from "./pages/ExamPage";
+import HRDashboard from "./components/HRDashboard";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +24,8 @@ const App = () => (
           <Route path="/test/:id" element={<TestLogin />} />
           <Route path="/test/:id/attempt" element={<TestAttempt />} />
           <Route path="/tests" element={<TestManagement />} />
+          <Route path="/exam/:id" element={<ExamPage examDuration={60} examId="1" />} />
+          <Route path="/hr-dashboard" element={<HRDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
